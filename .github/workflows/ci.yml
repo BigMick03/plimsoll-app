@@ -1,13 +1,27 @@
 name: CI
 
+# Two modes:
+# - test: offline checks and unit tests. Runs on every pull request and is the
+#   required check, so it never depends on testnet being up.
+# - live: the same SDK tests with PLIMSOLL_LIVE=1, reading the real testnet
+#   deployment. Runs on main, nightly and on demand, never on pull requests. A
+#   failure on main or on the nightly run opens (or comments on) an issue.
+
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
     name: test
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,9 +34,49 @@ jobs:
         run: npm run build -w @plimsoll/sdk
       - name: Typecheck
         run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: Test SDK (offline)
+        run: npm test
+      - name: Build web
+        run: npm run build -w @plimsoll/web
+
+  live:
+    name: live testnet
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Test SDK (including live testnet reads)
         run: npm test
         env:
           PLIMSOLL_LIVE: "1"
-      - name: Build web
-        run: npm run build -w @plimsoll/web
+      - name: Report the failure in an issue
+        if: failure() && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          title="Live testnet tests are failing"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" \
+              --body "Failed again ($EVENT, $GITHUB_SHA): $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$(printf '%s\n\n%s\n\n%s' \
+              "The live testnet job failed ($EVENT, $GITHUB_SHA): $RUN_URL" \
+              "An unreachable network skips these tests, so a failure means testnet answered with something the SDK did not expect: a reset, a redeployed contract or changed demo data." \
+              "Later failures are added here as comments. Close this issue once the live job passes again.")"
+          fi

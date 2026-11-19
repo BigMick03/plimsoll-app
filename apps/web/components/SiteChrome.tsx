@@ -31,7 +31,11 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              aria-current={path === item.href || (item.href !== "/" && path?.startsWith(item.href)) ? "page" : undefined}
+              aria-current={
+                path === item.href || (item.href !== "/" && path?.startsWith(item.href))
+                  ? "page"
+                  : undefined
+              }
             >
               {item.label}
             </Link>
@@ -49,21 +53,40 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <div className="wrap">
-        <span>Plimsoll — reserve coverage for Stellar-issued assets. Unaudited software on {config.networkName}.</span>
+        <span>
+          Plimsoll — reserve coverage for Stellar-issued assets. Unaudited software on{" "}
+          {config.networkName}.
+        </span>
         <span className="row">
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
             Docs
           </a>
-          <a href={explorer.contract(config.network.coverageLedgerId)} target="_blank" rel="noreferrer">
+          <a
+            href={explorer.contract(config.network.coverageLedgerId)}
+            target="_blank"
+            rel="noreferrer"
+          >
             Coverage ledger
           </a>
-          <a href="https://github.com/plimsoll-protocol/plimsoll-contracts" target="_blank" rel="noreferrer">
+          <a
+            href="https://github.com/plimsoll-protocol/plimsoll-contracts"
+            target="_blank"
+            rel="noreferrer"
+          >
             Contracts
           </a>
-          <a href="https://github.com/plimsoll-protocol/plimsoll-app" target="_blank" rel="noreferrer">
+          <a
+            href="https://github.com/plimsoll-protocol/plimsoll-app"
+            target="_blank"
+            rel="noreferrer"
+          >
             App
           </a>
-          <a href="https://github.com/plimsoll-protocol/plimsoll-indexer" target="_blank" rel="noreferrer">
+          <a
+            href="https://github.com/plimsoll-protocol/plimsoll-indexer"
+            target="_blank"
+            rel="noreferrer"
+          >
             Indexer
           </a>
         </span>

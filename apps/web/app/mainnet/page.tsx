@@ -35,7 +35,10 @@ export default function MainnetPage() {
     };
     for (const a of WATCHED) {
       const key = `${a.code}:${a.issuer}`;
-      Promise.all([fetchAssetRecord(MAINNET_HORIZON, a.code, a.issuer), fetchHomeDomain(MAINNET_HORIZON, a.issuer)])
+      Promise.all([
+        fetchAssetRecord(MAINNET_HORIZON, a.code, a.issuer),
+        fetchHomeDomain(MAINNET_HORIZON, a.issuer),
+      ])
         .then(([record, domain]) => {
           const supply = record ? supplyFromRecord(record) : null;
           set(key, { record, supply, domain, toml: null });
@@ -44,7 +47,13 @@ export default function MainnetPage() {
           );
         })
         .catch((err: unknown) =>
-          set(key, { record: null, supply: null, domain: "", toml: null, error: err instanceof Error ? err.message : String(err) }),
+          set(key, {
+            record: null,
+            supply: null,
+            domain: "",
+            toml: null,
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
     }
     setReadAt(new Date());
@@ -59,14 +68,18 @@ export default function MainnetPage() {
       <h1>Mainnet watch</h1>
       <p className="sub" style={{ maxWidth: 760 }}>
         The supply half of Plimsoll, on real assets, right now. Each figure below is read from
-        mainnet Horizon in your browser and counted with the same rule the Plimsoll indexer
-        posts on-chain. The reserve half is what is missing on mainnet today: no issuer below has
-        a signed reserve figure that a contract can read.
+        mainnet Horizon in your browser and counted with the same rule the Plimsoll indexer posts
+        on-chain. The reserve half is what is missing on mainnet today: no issuer below has a signed
+        reserve figure that a contract can read.
       </p>
 
       <div className="grid mt">
         {WATCHED.map((a) => (
-          <WatchCard key={a.code + a.issuer} asset={a} reading={readings[`${a.code}:${a.issuer}`]} />
+          <WatchCard
+            key={a.code + a.issuer}
+            asset={a}
+            reading={readings[`${a.code}:${a.issuer}`]}
+          />
         ))}
       </div>
 
@@ -77,9 +90,9 @@ export default function MainnetPage() {
           balances, liquidity-pool reserves and balances held by Soroban contracts.
         </li>
         <li>
-          <strong>Issuer controls</strong> are flags on the issuer account. Clawback and
-          revocation mean the issuer can take back or freeze balances; that is normal for
-          regulated assets and worth knowing.
+          <strong>Issuer controls</strong> are flags on the issuer account. Clawback and revocation
+          mean the issuer can take back or freeze balances; that is normal for regulated assets and
+          worth knowing.
         </li>
         <li>
           <strong>stellar.toml</strong> is the issuer&apos;s SEP-1 file. &quot;Confirms this
@@ -92,7 +105,9 @@ export default function MainnetPage() {
           &quot;could not load&quot;, open the link directly.
         </li>
       </ul>
-      {readAt ? <p className="sub">Read at {readAt.toISOString().replace("T", " ").slice(0, 19)} UTC.</p> : null}
+      {readAt ? (
+        <p className="sub">Read at {readAt.toISOString().replace("T", " ").slice(0, 19)} UTC.</p>
+      ) : null}
       <p className="mt">
         <Link href="/">See full coverage readings on testnet</Link>
       </p>
@@ -102,7 +117,11 @@ export default function MainnetPage() {
 
 const BUCKETS: { key: keyof Omit<SupplyBuckets, "total">; label: string; className: string }[] = [
   { key: "authorized", label: "Trustlines", className: "b-trust" },
-  { key: "authorizedToMaintainLiabilities", label: "Trustlines (restricted)", className: "b-restricted" },
+  {
+    key: "authorizedToMaintainLiabilities",
+    label: "Trustlines (restricted)",
+    className: "b-restricted",
+  },
   { key: "unauthorized", label: "Trustlines (frozen)", className: "b-frozen" },
   { key: "liquidityPools", label: "Liquidity pools", className: "b-pools" },
   { key: "contracts", label: "Soroban contracts", className: "b-contracts" },
@@ -116,7 +135,11 @@ function share(part: bigint, total: bigint): number {
 function WatchCard({ asset, reading }: { asset: WatchedAsset; reading: Reading | undefined }) {
   const explorer = `${MAINNET_EXPLORER}/asset/${asset.code}-${asset.issuer}`;
   return (
-    <section className="card" style={{ display: "grid", gap: 14 }} aria-label={`${asset.code} by ${asset.label}`}>
+    <section
+      className="card"
+      style={{ display: "grid", gap: 14 }}
+      aria-label={`${asset.code} by ${asset.label}`}
+    >
       <div className="asset-head">
         <div>
           <div className="asset-code">{asset.code}</div>
@@ -151,7 +174,9 @@ function WatchCard({ asset, reading }: { asset: WatchedAsset; reading: Reading |
             <div className="stack-bar" role="img" aria-label="Where the supply sits">
               {BUCKETS.map((b) => {
                 const pct = share(reading.supply![b.key], reading.supply!.total);
-                return pct > 0 ? <span key={b.key} className={b.className} style={{ width: `${pct}%` }} /> : null;
+                return pct > 0 ? (
+                  <span key={b.key} className={b.className} style={{ width: `${pct}%` }} />
+                ) : null;
               })}
             </div>
             <ul className="legend">

@@ -24,7 +24,10 @@ export const config: AppConfig = {
     horizonUrl: env(process.env.NEXT_PUBLIC_HORIZON_URL, TESTNET.horizonUrl ?? ""),
     networkPassphrase: env(process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE, TESTNET.networkPassphrase),
     coverageLedgerId: env(process.env.NEXT_PUBLIC_COVERAGE_LEDGER_ID, TESTNET.coverageLedgerId),
-    reporterRegistryId: env(process.env.NEXT_PUBLIC_REPORTER_REGISTRY_ID, TESTNET.reporterRegistryId),
+    reporterRegistryId: env(
+      process.env.NEXT_PUBLIC_REPORTER_REGISTRY_ID,
+      TESTNET.reporterRegistryId,
+    ),
   },
   networkName: env(process.env.NEXT_PUBLIC_NETWORK_NAME, "testnet"),
   indexerUrl: ((url) => (url === "none" ? "" : url))(
@@ -39,10 +42,7 @@ export const config: AppConfig = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
-  explorerUrl: env(
-    process.env.NEXT_PUBLIC_EXPLORER_URL,
-    "https://stellar.expert/explorer/testnet",
-  ),
+  explorerUrl: env(process.env.NEXT_PUBLIC_EXPLORER_URL, "https://stellar.expert/explorer/testnet"),
   basePath: process.env.NEXT_PUBLIC_BASE_PATH ?? "",
 };
 

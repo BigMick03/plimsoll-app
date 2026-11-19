@@ -85,7 +85,15 @@ export function Gauge({ bps, status }: { bps: number | undefined; status: Covera
   );
 }
 
-export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+export function Stat({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+}) {
   return (
     <div className="stat">
       <div className="stat-label">{label}</div>

@@ -76,6 +76,20 @@ PLIMSOLL_LIVE=1 npm test         # plus reads against the live testnet contracts
 npm run build                    # static site in apps/web/out
 ```
 
+### Offline and live tests
+
+The SDK tests run in two modes:
+
+| Mode | Command | In CI |
+| --- | --- | --- |
+| Offline | `npm test` | The `test` job, on every pull request and push to `main`. It is the required check and never touches the network: RPC and the indexer are stubbed. |
+| Live | `PLIMSOLL_LIVE=1 npm test` | The `live testnet` job, on every push to `main`, nightly, and on demand from the Actions tab. It never runs on pull requests, so a testnet reset or an RPC outage cannot block one. |
+
+A live test whose network cannot be reached is skipped rather than failed. When
+the live job fails on `main` or on the nightly run, it opens an issue titled
+"Live testnet tests are failing" (or comments on the open one) with a link to
+the run.
+
 ## SDK in 6 lines
 
 ```ts
