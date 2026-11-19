@@ -1,0 +1,5 @@
+# Prettier also skips everything in .gitignore (dist, .next, out, next-env.d.ts).
+package-lock.json
+
+# README and the GitBook docs keep their hand-aligned tables and list markers.
+*.md
