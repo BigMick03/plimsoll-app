@@ -1,0 +1,215 @@
+import {
+  Account,
+  BASE_FEE,
+  Keypair,
+  Operation,
+  Transaction,
+  TransactionBuilder,
+  nativeToScVal,
+  rpc,
+  xdr,
+} from "@stellar/stellar-sdk";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ContractCallError, PlimsollContracts, TESTNET, Tier } from "../src/index";
+
+// Every RPC method the client uses is stubbed on its own `server`, so nothing
+// here touches the network. The RPC URL points at a closed local port as a
+// backstop: a call that slipped past the stubs fails instead of reaching testnet.
+const config = { ...TESTNET, rpcUrl: "http://127.0.0.1:9" };
+const sac = TESTNET.assets.PUSD!.sac;
+
+type Sim = rpc.Api.SimulateTransactionResponse;
+
+const simSuccess = (retval?: xdr.ScVal): Sim =>
+  ({
+    _parsed: true,
+    id: "1",
+    latestLedger: 100,
+    events: [],
+    transactionData: {},
+    minResourceFee: "100",
+    ...(retval ? { result: { auth: [], retval } } : {}),
+  }) as unknown as Sim;
+
+const simError = (error: string): Sim =>
+  ({ _parsed: true, id: "1", latestLedger: 100, events: [], error }) as unknown as Sim;
+
+const sent = (status: rpc.Api.SendTransactionStatus): rpc.Api.SendTransactionResponse => ({
+  status,
+  hash: "ab".repeat(32),
+  latestLedger: 100,
+  latestLedgerCloseTime: 1_700_000_000,
+});
+
+const polled = (status: rpc.Api.GetTransactionStatus): rpc.Api.GetTransactionResponse =>
+  ({
+    status,
+    txHash: "ab".repeat(32),
+    latestLedger: 101,
+  }) as unknown as rpc.Api.GetTransactionResponse;
+
+/** A signed transaction, as a wallet would hand it back. */
+function signedXdr(): string {
+  const signer = Keypair.random();
+  const tx = new TransactionBuilder(new Account(signer.publicKey(), "1"), {
+    fee: BASE_FEE,
+    networkPassphrase: config.networkPassphrase,
+  })
+    .addOperation(Operation.bumpSequence({ bumpTo: "2" }))
+    .setTimeout(300)
+    .build();
+  tx.sign(signer);
+  return tx.toXDR();
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("PlimsollContracts reads", () => {
+  it("decodes a successful simulation", async () => {
+    const client = new PlimsollContracts(config);
+    const simulate = vi.spyOn(client.server, "simulateTransaction").mockResolvedValue(
+      simSuccess(
+        nativeToScVal(
+          {
+            bps: 10_200,
+            supply: 10_000_000_000_000n,
+            reserves: 10_200_000_000_000n,
+            tier: 2,
+            supply_ledger: 5_034_657,
+            supply_timestamp: 1_791_196_882n,
+            report_as_of: 1_791_158_400n,
+          },
+          {
+            type: {
+              bps: ["symbol", "u32"],
+              supply: ["symbol", "i128"],
+              reserves: ["symbol", "i128"],
+              tier: ["symbol", "u32"],
+              supply_ledger: ["symbol", "u32"],
+              supply_timestamp: ["symbol", "u64"],
+              report_as_of: ["symbol", "u64"],
+            },
+          },
+        ),
+      ),
+    );
+
+    await expect(client.coverage(sac, Tier.Transcribed)).resolves.toEqual({
+      bps: 10_200,
+      supply: 10_000_000_000_000n,
+      reserves: 10_200_000_000_000n,
+      tier: Tier.IssuerSigned,
+      supplyLedger: 5_034_657,
+      supplyTimestamp: 1_791_196_882,
+      reportAsOf: 1_791_158_400,
+    });
+    expect(simulate).toHaveBeenCalledOnce();
+  });
+
+  it("returns the boolean from is_covered", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "simulateTransaction").mockResolvedValue(
+      simSuccess(nativeToScVal(true)),
+    );
+    await expect(client.isCovered(sac, 10_000, 7 * 86_400, Tier.IssuerSigned)).resolves.toBe(true);
+  });
+
+  it("returns null when the contract returns nothing", async () => {
+    const client = new PlimsollContracts(config);
+    const simulate = vi.spyOn(client.server, "simulateTransaction");
+
+    // The contract returned None.
+    simulate.mockResolvedValueOnce(simSuccess(xdr.ScVal.scvVoid()));
+    await expect(client.getAsset(sac)).resolves.toBeNull();
+
+    // The simulation carried no return value at all.
+    simulate.mockResolvedValueOnce(simSuccess());
+    await expect(client.getReport(sac, Tier.AuditorSigned)).resolves.toBeNull();
+
+    // A missing value is not a yes.
+    simulate.mockResolvedValueOnce(simSuccess());
+    await expect(client.isCovered(sac, 10_000, 86_400, Tier.Transcribed)).resolves.toBe(false);
+  });
+
+  it("throws ContractCallError when the simulation fails", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "simulateTransaction").mockResolvedValue(
+      simError("HostError: Error(Contract, #3)"),
+    );
+    const err = await client.coverage(sac, Tier.Transcribed).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ContractCallError);
+    expect(err).toMatchObject({ method: "coverage", detail: "HostError: Error(Contract, #3)" });
+    expect(String(err)).toContain("Error(Contract, #3)");
+  });
+});
+
+describe("PlimsollContracts writes", () => {
+  const source = Keypair.random().publicKey();
+
+  it("returns the prepared transaction as XDR", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "getAccount").mockResolvedValue(new Account(source, "41"));
+    const prepare = vi
+      .spyOn(client.server, "prepareTransaction")
+      .mockImplementation(async (tx) => tx as Transaction);
+
+    const out = await client.prepareListAsset(source, sac);
+    const tx = TransactionBuilder.fromXDR(out, config.networkPassphrase);
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(tx).toBeInstanceOf(Transaction);
+    expect((tx as Transaction).source).toBe(source);
+    expect((tx as Transaction).sequence).toBe("42");
+  });
+
+  it("wraps a prepare failure in ContractCallError", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "getAccount").mockResolvedValue(new Account(source, "41"));
+    vi.spyOn(client.server, "prepareTransaction").mockRejectedValue(
+      new Error("simulation failed: Error(Contract, #5)"),
+    );
+
+    const err = await client.prepareListAsset(source, sac).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ContractCallError);
+    expect(err).toMatchObject({ method: "prepare" });
+    expect(String(err)).toContain("Error(Contract, #5)");
+  });
+
+  it("submits, polls and returns the hash", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "sendTransaction").mockResolvedValue(sent("PENDING"));
+    const poll = vi
+      .spyOn(client.server, "pollTransaction")
+      .mockResolvedValue(polled(rpc.Api.GetTransactionStatus.SUCCESS));
+
+    await expect(client.submit(signedXdr())).resolves.toBe("ab".repeat(32));
+    expect(poll).toHaveBeenCalledWith("ab".repeat(32), { attempts: 30 });
+  });
+
+  it.each(["ERROR", "TRY_AGAIN_LATER"] as const)(
+    "throws without polling when the RPC answers %s",
+    async (status) => {
+      const client = new PlimsollContracts(config);
+      vi.spyOn(client.server, "sendTransaction").mockResolvedValue(sent(status));
+      const poll = vi.spyOn(client.server, "pollTransaction");
+
+      const err = await client.submit(signedXdr()).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ContractCallError);
+      expect(String(err)).toContain(`status ${status}`);
+      expect(poll).not.toHaveBeenCalled();
+    },
+  );
+
+  it("throws when the transaction lands as failed", async () => {
+    const client = new PlimsollContracts(config);
+    vi.spyOn(client.server, "sendTransaction").mockResolvedValue(sent("PENDING"));
+    vi.spyOn(client.server, "pollTransaction").mockResolvedValue(
+      polled(rpc.Api.GetTransactionStatus.FAILED),
+    );
+
+    const err = await client.submit(signedXdr()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ContractCallError);
+    expect(String(err)).toContain(`transaction ${"ab".repeat(32)} FAILED`);
+  });
+});
