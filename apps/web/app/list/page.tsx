@@ -49,14 +49,20 @@ export default function ListPage() {
       if (/MissingValue|non-existent|contract.*not found|Error\(Storage/i.test(msg)) {
         setStep({ kind: "needs-sac", sac });
       } else {
-        setStep({ kind: "err", msg: /#1\b/.test(msg) ? "That address is not a Stellar Asset Contract." : msg });
+        setStep({
+          kind: "err",
+          msg: /#1\b/.test(msg) ? "That address is not a Stellar Asset Contract." : msg,
+        });
       }
     }
   };
 
   const deploySac = async () => {
     try {
-      await signAndSend((src) => contracts.prepareDeploySac(src, code, issuer), "asset contract deployment");
+      await signAndSend(
+        (src) => contracts.prepareDeploySac(src, code, issuer),
+        "asset contract deployment",
+      );
       await list();
     } catch (e) {
       setStep({ kind: "err", msg: e instanceof Error ? e.message : String(e) });
@@ -82,11 +88,23 @@ export default function ListPage() {
       >
         <label>
           Asset code
-          <input value={code} onChange={(e) => setCode(e.target.value.trim())} placeholder="USDC" maxLength={12} required />
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.trim())}
+            placeholder="USDC"
+            maxLength={12}
+            required
+          />
         </label>
         <label>
           Issuer account
-          <input className="mono" value={issuer} onChange={(e) => setIssuer(e.target.value.trim())} placeholder="G…" required />
+          <input
+            className="mono"
+            value={issuer}
+            onChange={(e) => setIssuer(e.target.value.trim())}
+            placeholder="G…"
+            required
+          />
         </label>
         {valid ? (
           <p className="sub">
@@ -94,7 +112,9 @@ export default function ListPage() {
           </p>
         ) : null}
         <div>
-          <button type="submit" disabled={!valid || step.kind === "busy"}>List asset</button>
+          <button type="submit" disabled={!valid || step.kind === "busy"}>
+            List asset
+          </button>
         </div>
       </form>
 
@@ -108,7 +128,9 @@ export default function ListPage() {
             {step.hash ? (
               <>
                 {" · "}
-                <a href={explorer.tx(step.hash)} target="_blank" rel="noreferrer">transaction</a>
+                <a href={explorer.tx(step.hash)} target="_blank" rel="noreferrer">
+                  transaction
+                </a>
               </>
             ) : null}
           </p>
@@ -116,10 +138,12 @@ export default function ListPage() {
         {step.kind === "needs-sac" ? (
           <div className="notice notice-info">
             <p>
-              This asset has no Stellar Asset Contract on {config.networkName} yet. Deploying it is a
-              one-time, permissionless step that does not change the asset.
+              This asset has no Stellar Asset Contract on {config.networkName} yet. Deploying it is
+              a one-time, permissionless step that does not change the asset.
             </p>
-            <button type="button" onClick={deploySac}>Deploy asset contract, then list</button>
+            <button type="button" onClick={deploySac}>
+              Deploy asset contract, then list
+            </button>
           </div>
         ) : null}
       </div>

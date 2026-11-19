@@ -18,7 +18,16 @@ import {
   type SupplyBreakdown,
   type TomlCheck,
 } from "@plimsoll/sdk";
-import { Gauge, Skeleton, Stat, StatusPill, TierPill, nowSecs, ratioText, statusOf } from "@/components/ui";
+import {
+  Gauge,
+  Skeleton,
+  Stat,
+  StatusPill,
+  TierPill,
+  nowSecs,
+  ratioText,
+  statusOf,
+} from "@/components/ui";
 import { config, explorer } from "@/lib/config";
 import {
   contracts,
@@ -66,9 +75,18 @@ function AssetDetail() {
   }, [sac]);
 
   if (!sac) {
-    return <p className="notice notice-info">No asset selected. <Link href="/">Back to all assets</Link>.</p>;
+    return (
+      <p className="notice notice-info">
+        No asset selected. <Link href="/">Back to all assets</Link>.
+      </p>
+    );
   }
-  if (error) return <p className="notice notice-bad" role="alert">Could not load this asset: {error}</p>;
+  if (error)
+    return (
+      <p className="notice notice-bad" role="alert">
+        Could not load this asset: {error}
+      </p>
+    );
   if (asset === undefined) {
     return (
       <div style={{ display: "grid", gap: 14 }}>
@@ -100,7 +118,12 @@ function AssetDetail() {
           <h1 style={{ marginBottom: 4 }}>{asset.code}</h1>
           <div className="sub">
             Issuer{" "}
-            <a className="mono" href={explorer.account(asset.issuer)} target="_blank" rel="noreferrer">
+            <a
+              className="mono"
+              href={explorer.account(asset.issuer)}
+              target="_blank"
+              rel="noreferrer"
+            >
               {shortAddress(asset.issuer, 6)}
             </a>
             {asset.toml?.home_domain ? <> · {asset.toml.home_domain}</> : null}
@@ -114,10 +137,14 @@ function AssetDetail() {
       </div>
 
       <section className="card mt" aria-labelledby="coverage-h">
-        <h2 id="coverage-h" className="sr-only">Coverage</h2>
+        <h2 id="coverage-h" className="sr-only">
+          Coverage
+        </h2>
         <div className="spread">
           <div>
-            <div className="ratio" style={{ fontSize: "2.6rem" }}>{ratioText(c?.bps)}</div>
+            <div className="ratio" style={{ fontSize: "2.6rem" }}>
+              {ratioText(c?.bps)}
+            </div>
             <div className="sub">
               {c
                 ? `${formatUnits(c.reserves)} in reserves against ${formatUnits(c.supply)} circulating`
@@ -135,7 +162,9 @@ function AssetDetail() {
         <Stat
           label="Circulating supply"
           value={asset.supply ? formatUnits(asset.supply.amount) : "—"}
-          sub={asset.supply ? `at ledger ${asset.supply.ledger.toLocaleString()}` : "not posted yet"}
+          sub={
+            asset.supply ? `at ledger ${asset.supply.ledger.toLocaleString()}` : "not posted yet"
+          }
         />
         <Stat
           label="Supply posted"
@@ -147,9 +176,15 @@ function AssetDetail() {
           value={c ? new Date(c.reportAsOf * 1000).toISOString().slice(0, 10) : "—"}
           sub={c ? ago(now - c.reportAsOf) : undefined}
         />
-        <Stat label="Asset contract" value={<span className="mono">{shortAddress(asset.sac, 6)}</span>} sub={
-          <a href={explorer.contract(asset.sac)} target="_blank" rel="noreferrer">explorer</a>
-        } />
+        <Stat
+          label="Asset contract"
+          value={<span className="mono">{shortAddress(asset.sac, 6)}</span>}
+          sub={
+            <a href={explorer.contract(asset.sac)} target="_blank" rel="noreferrer">
+              explorer
+            </a>
+          }
+        />
       </div>
 
       <h2>Reserve reports</h2>
@@ -184,7 +219,9 @@ function AssetDetail() {
               ) : (
                 <tr key={tier}>
                   <td>{tierLabel(tier)}</td>
-                  <td colSpan={5} className="sub">No report at this tier.</td>
+                  <td colSpan={5} className="sub">
+                    No report at this tier.
+                  </td>
                 </tr>
               );
             })}
@@ -237,10 +274,13 @@ function ReportRow({
   now: number;
   name?: string;
 }) {
-  const covers = supply && supply > 0n ? bpsToPercent(Number((report.amount * 10_000n) / supply)) : "—";
+  const covers =
+    supply && supply > 0n ? bpsToPercent(Number((report.amount * 10_000n) / supply)) : "—";
   return (
     <tr>
-      <td><TierPill tier={report.tier} /></td>
+      <td>
+        <TierPill tier={report.tier} />
+      </td>
       <td className="num">{formatUnits(report.amount)}</td>
       <td className="num">{covers}</td>
       <td className="num">
@@ -262,17 +302,22 @@ function ReportRow({
           {shortAddress(report.reporter)}
         </a>
         {report.reporter === issuer ? <div className="sub">issuer account</div> : null}
-        <div className="sub"><Provenance view={report} /></div>
+        <div className="sub">
+          <Provenance view={report} />
+        </div>
       </td>
       <td>
-        <a href={report.docUri} target="_blank" rel="noreferrer">Open</a>
+        <a href={report.docUri} target="_blank" rel="noreferrer">
+          Open
+        </a>
         <DocCheck uri={report.docUri} hash={report.docHash} />
       </td>
     </tr>
   );
 }
 
-type CheckState = { kind: "idle" } | { kind: "busy" } | { kind: "ok" } | { kind: "bad"; msg: string };
+type CheckState =
+  { kind: "idle" } | { kind: "busy" } | { kind: "ok" } | { kind: "bad"; msg: string };
 
 function DocCheck({ uri, hash }: { uri: string; hash: string }) {
   const [state, setState] = useState<CheckState>({ kind: "idle" });
@@ -290,7 +335,12 @@ function DocCheck({ uri, hash }: { uri: string; hash: string }) {
   return (
     <div className="sub" aria-live="polite">
       {state.kind === "idle" ? (
-        <button type="button" className="secondary" style={{ padding: "2px 8px", fontSize: "0.8rem", marginTop: 4 }} onClick={run}>
+        <button
+          type="button"
+          className="secondary"
+          style={{ padding: "2px 8px", fontSize: "0.8rem", marginTop: 4 }}
+          onClick={run}
+        >
           Verify hash
         </button>
       ) : state.kind === "busy" ? (
@@ -305,7 +355,9 @@ function DocCheck({ uri, hash }: { uri: string; hash: string }) {
 }
 
 function LiveCheck({ sac }: { sac: string }) {
-  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; text: string } | { kind: "err"; text: string }>({ kind: "idle" });
+  const [state, setState] = useState<
+    { kind: "idle" | "busy" } | { kind: "done"; text: string } | { kind: "err"; text: string }
+  >({ kind: "idle" });
   const run = async () => {
     setState({ kind: "busy" });
     try {
@@ -328,12 +380,24 @@ function LiveCheck({ sac }: { sac: string }) {
       <button type="button" className="secondary" onClick={run} disabled={state.kind === "busy"}>
         {state.kind === "busy" ? "Reading contract…" : "Check on-chain now"}
       </button>
-      {"text" in state ? <div className="sub" style={{ marginTop: 6 }}>{state.text}</div> : null}
+      {"text" in state ? (
+        <div className="sub" style={{ marginTop: 6 }}>
+          {state.text}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function SupplySection({ hash, poster, posterName }: { hash: string; poster: string; posterName?: string }) {
+function SupplySection({
+  hash,
+  poster,
+  posterName,
+}: {
+  hash: string;
+  poster: string;
+  posterName?: string;
+}) {
   const [breakdown, setBreakdown] = useState<SupplyBreakdown | null>(null);
   const [verified, setVerified] = useState<boolean | null>(null);
   useEffect(() => {
@@ -360,8 +424,10 @@ function SupplySection({ hash, poster, posterName }: { hash: string; poster: str
       <h2>How supply was counted</h2>
       <p className="sub">
         Posted by {posterName ? `${posterName}, ` : null}
-        <a className="mono" href={explorer.account(poster)} target="_blank" rel="noreferrer">{shortAddress(poster)}</a>.
-        Breakdown hash <code className="break">{hash}</code>
+        <a className="mono" href={explorer.account(poster)} target="_blank" rel="noreferrer">
+          {shortAddress(poster)}
+        </a>
+        . Breakdown hash <code className="break">{hash}</code>
       </p>
       {breakdown ? (
         <div className="table-wrap">
@@ -374,20 +440,28 @@ function SupplySection({ hash, poster, posterName }: { hash: string; poster: str
                 </tr>
               ))}
               <tr>
-                <td><strong>Total</strong></td>
-                <td className="num"><strong>{formatUnits(BigInt(breakdown.total))}</strong></td>
+                <td>
+                  <strong>Total</strong>
+                </td>
+                <td className="num">
+                  <strong>{formatUnits(BigInt(breakdown.total))}</strong>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       ) : (
         <p className="sub">
-          {config.indexerUrl ? "Breakdown not available from the indexer." : "The per-bucket breakdown is served by the indexer, which this deployment is not using."}
+          {config.indexerUrl
+            ? "Breakdown not available from the indexer."
+            : "The per-bucket breakdown is served by the indexer, which this deployment is not using."}
         </p>
       )}
       {verified !== null ? (
         <p className={`notice mt ${verified ? "notice-ok" : "notice-bad"}`}>
-          {verified ? "The breakdown hashes to the value recorded on-chain." : "The breakdown does NOT match the on-chain hash."}
+          {verified
+            ? "The breakdown hashes to the value recorded on-chain."
+            : "The breakdown does NOT match the on-chain hash."}
         </p>
       ) : null}
     </>
@@ -412,7 +486,11 @@ function IssuerToml({ asset }: { asset: AssetView }) {
         if (!cancelled) setLive({ domain, check });
       })
       .catch((e: unknown) => {
-        if (!cancelled) setLive({ domain: "", check: { status: "unreachable", detail: e instanceof Error ? e.message : String(e) } });
+        if (!cancelled)
+          setLive({
+            domain: "",
+            check: { status: "unreachable", detail: e instanceof Error ? e.message : String(e) },
+          });
       });
     return () => {
       cancelled = true;
@@ -420,7 +498,8 @@ function IssuerToml({ asset }: { asset: AssetView }) {
   }, [cached, asset.issuer, asset.code]);
 
   const domain = cached?.home_domain ?? live?.domain ?? "";
-  const currency = cached?.currency ?? (live?.check.status === "confirmed" ? live.check.currency : undefined);
+  const currency =
+    cached?.currency ?? (live?.check.status === "confirmed" ? live.check.currency : undefined);
   const orgName = cached?.org_name ?? live?.check.orgName;
 
   if (!cached && !live) return <p className="sub">Checking the issuer&apos;s home domain…</p>;
@@ -451,7 +530,10 @@ function IssuerToml({ asset }: { asset: AssetView }) {
       <ul>
         {currency.name ? <li>Name: {currency.name}</li> : null}
         <li>
-          Anchored: {currency.is_asset_anchored ? `yes, to ${currency.anchor_asset ?? "an off-chain asset"}` : "not stated"}
+          Anchored:{" "}
+          {currency.is_asset_anchored
+            ? `yes, to ${currency.anchor_asset ?? "an off-chain asset"}`
+            : "not stated"}
         </li>
         <li>
           Reserve attestation link:{" "}

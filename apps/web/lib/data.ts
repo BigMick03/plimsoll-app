@@ -170,7 +170,9 @@ export async function loadAssets(): Promise<AssetView[]> {
       console.warn("Indexer unavailable, reading from chain", err);
     }
   }
-  const all = await Promise.all(config.chainAssets.map((sac) => loadFromChain(sac).catch(() => null)));
+  const all = await Promise.all(
+    config.chainAssets.map((sac) => loadFromChain(sac).catch(() => null)),
+  );
   return all.filter((a): a is AssetView => a !== null);
 }
 
@@ -197,7 +199,9 @@ export async function loadAsset(sac: string): Promise<AssetView | null> {
  */
 const nameCache = new Map<string, string | null>();
 
-export async function loadReporterNames(addresses: readonly string[]): Promise<Map<string, string>> {
+export async function loadReporterNames(
+  addresses: readonly string[],
+): Promise<Map<string, string>> {
   const wanted = [...new Set(addresses)].filter((a) => a.length > 0);
   const missing = wanted.filter((a) => !nameCache.has(a));
 

@@ -6,7 +6,11 @@ import { explorer } from "@/lib/config";
 import { contracts, loadAssets, type AssetView } from "@/lib/data";
 import { WalletError, connectWallet, signXdr } from "@/lib/wallet";
 
-type Status = { kind: "idle" } | { kind: "busy"; msg: string } | { kind: "ok"; hash: string; tier: Tier } | { kind: "err"; msg: string };
+type Status =
+  | { kind: "idle" }
+  | { kind: "busy"; msg: string }
+  | { kind: "ok"; hash: string; tier: Tier }
+  | { kind: "err"; msg: string };
 
 export default function ReportPage() {
   const [assets, setAssets] = useState<AssetView[]>([]);
@@ -100,16 +104,23 @@ export default function ReportPage() {
     }
   };
 
-  const ready = address && tier && sac && amount && docUri && /^[0-9a-f]{64}$/.test(docHash) && status.kind !== "busy";
+  const ready =
+    address &&
+    tier &&
+    sac &&
+    amount &&
+    docUri &&
+    /^[0-9a-f]{64}$/.test(docHash) &&
+    status.kind !== "busy";
 
   return (
     <>
       <div className="eyebrow">For issuers, auditors and transcribers</div>
       <h1>Post a reserve report</h1>
       <p className="sub" style={{ maxWidth: 680 }}>
-        Your account decides the weight of the report. The asset&apos;s issuer account posts at
-        the Issuer-signed tier. Registered auditors post at Auditor-signed, registered
-        transcribers at Transcribed. Anyone else is refused by the contract.
+        Your account decides the weight of the report. The asset&apos;s issuer account posts at the
+        Issuer-signed tier. Registered auditors post at Auditor-signed, registered transcribers at
+        Transcribed. Anyone else is refused by the contract.
       </p>
 
       <div className="card mt" style={{ maxWidth: 680 }}>
@@ -119,7 +130,9 @@ export default function ReportPage() {
               Connected as <code className="break">{address}</code>
             </span>
             <span>
-              {tier === undefined ? "Checking role…" : tier === null ? (
+              {tier === undefined ? (
+                "Checking role…"
+              ) : tier === null ? (
                 <span className="pill pill-under">Not allowed to report</span>
               ) : (
                 <span className="pill pill-tier">Will post as {tierLabel(tier)}</span>
@@ -127,7 +140,9 @@ export default function ReportPage() {
             </span>
           </div>
         ) : (
-          <button type="button" onClick={connect}>Connect Freighter</button>
+          <button type="button" onClick={connect}>
+            Connect Freighter
+          </button>
         )}
       </div>
 
@@ -145,33 +160,65 @@ export default function ReportPage() {
         <label>
           Reserves held
           <span className="hint">In units of the asset, up to 7 decimals. Example: 1,020,000</span>
-          <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1,020,000" required />
+          <input
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="1,020,000"
+            required
+          />
         </label>
         <label>
           As of (UTC date)
-          <span className="hint">The date the reserve figure describes. Cannot be in the future.</span>
+          <span className="hint">
+            The date the reserve figure describes. Cannot be in the future.
+          </span>
           <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} required />
         </label>
         <label>
           Source document URL
-          <span className="hint">A stable link to the attestation or statement (PDF, page, file).</span>
-          <input type="url" value={docUri} onChange={(e) => setDocUri(e.target.value)} placeholder="https://…" required maxLength={256} />
+          <span className="hint">
+            A stable link to the attestation or statement (PDF, page, file).
+          </span>
+          <input
+            type="url"
+            value={docUri}
+            onChange={(e) => setDocUri(e.target.value)}
+            placeholder="https://…"
+            required
+            maxLength={256}
+          />
         </label>
         <div>
           <label>
             Document SHA-256
-            <span className="hint">Upload the file or fetch it from the URL; the hash is computed in your browser.</span>
-            <input className="mono" value={docHash} onChange={(e) => setDocHash(e.target.value.trim().toLowerCase())} placeholder="64 hex characters" required />
+            <span className="hint">
+              Upload the file or fetch it from the URL; the hash is computed in your browser.
+            </span>
+            <input
+              className="mono"
+              value={docHash}
+              onChange={(e) => setDocHash(e.target.value.trim().toLowerCase())}
+              placeholder="64 hex characters"
+              required
+            />
           </label>
           <div className="row" style={{ marginTop: 8 }}>
-            <input type="file" aria-label="Upload document to hash" onChange={(e) => hashFile(e.target.files?.[0])} style={{ maxWidth: 320 }} />
+            <input
+              type="file"
+              aria-label="Upload document to hash"
+              onChange={(e) => hashFile(e.target.files?.[0])}
+              style={{ maxWidth: 320 }}
+            />
             <button type="button" className="secondary" onClick={hashUrl} disabled={!docUri}>
               Hash from URL
             </button>
           </div>
         </div>
         <div>
-          <button type="submit" disabled={!ready}>Sign and post</button>
+          <button type="submit" disabled={!ready}>
+            Sign and post
+          </button>
         </div>
       </form>
 
@@ -181,8 +228,10 @@ export default function ReportPage() {
         {status.kind === "ok" ? (
           <p className="notice notice-ok">
             Posted as {tierLabel(status.tier)}.{" "}
-            <a href={explorer.tx(status.hash)} target="_blank" rel="noreferrer">View transaction</a>.
-            The dashboard updates once the indexer picks up the event.
+            <a href={explorer.tx(status.hash)} target="_blank" rel="noreferrer">
+              View transaction
+            </a>
+            . The dashboard updates once the indexer picks up the event.
           </p>
         ) : null}
       </div>

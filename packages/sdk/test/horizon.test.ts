@@ -23,7 +23,12 @@ const record: HorizonAssetRecord = {
   claimable_balances_amount: "25747.5652831",
   liquidity_pools_amount: "5329035.9202534",
   contracts_amount: "76649744.8499999",
-  flags: { auth_required: false, auth_revocable: false, auth_immutable: false, auth_clawback_enabled: false },
+  flags: {
+    auth_required: false,
+    auth_revocable: false,
+    auth_immutable: false,
+    auth_clawback_enabled: false,
+  },
 };
 
 describe("supplyFromRecord", () => {
@@ -82,14 +87,18 @@ describe("network helpers", () => {
     });
     expect((await checkStellarToml("ok.example", "USDX", "GREAL", f)).status).toBe("confirmed");
     expect((await checkStellarToml("gone.example", "USDX", "GREAL", f)).status).toBe("not-found");
-    expect((await checkStellarToml("blocked.example", "USDX", "GREAL", f)).status).toBe("unreachable");
+    expect((await checkStellarToml("blocked.example", "USDX", "GREAL", f)).status).toBe(
+      "unreachable",
+    );
     expect((await checkStellarToml("cors.example", "USDX", "GREAL", f)).status).toBe("unreachable");
     expect((await checkStellarToml("", "USDX", "GREAL", f)).status).toBe("no-domain");
   });
 
   it("fetchAssetRecord returns null for unknown assets", async () => {
     const f = fake({
-      "https://h.example/assets?asset_code=NOPE&asset_issuer=GX": { body: '{"_embedded":{"records":[]}}' },
+      "https://h.example/assets?asset_code=NOPE&asset_issuer=GX": {
+        body: '{"_embedded":{"records":[]}}',
+      },
     });
     expect(await fetchAssetRecord("https://h.example/", "NOPE", "GX", f)).toBeNull();
   });
@@ -119,17 +128,21 @@ describe("network helpers", () => {
 });
 
 // Reads mainnet Horizon. Run with PLIMSOLL_LIVE=1.
-describe.skipIf(!process.env.PLIMSOLL_LIVE)("live mainnet", () => {
-  it("reads Circle USDC supply on Stellar", async (ctx) => {
-    const r = await live(ctx, () =>
-      fetchAssetRecord(
-        "https://horizon.stellar.org",
-        "USDC",
-        "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
-      ),
-    );
-    expect(r).not.toBeNull();
-    // More than 100 million USDC circulate on Stellar.
-    expect(supplyFromRecord(r!).total).toBeGreaterThan(100_000_000n * 10_000_000n);
-  });
-}, 60_000);
+describe.skipIf(!process.env.PLIMSOLL_LIVE)(
+  "live mainnet",
+  () => {
+    it("reads Circle USDC supply on Stellar", async (ctx) => {
+      const r = await live(ctx, () =>
+        fetchAssetRecord(
+          "https://horizon.stellar.org",
+          "USDC",
+          "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        ),
+      );
+      expect(r).not.toBeNull();
+      // More than 100 million USDC circulate on Stellar.
+      expect(supplyFromRecord(r!).total).toBeGreaterThan(100_000_000n * 10_000_000n);
+    });
+  },
+  60_000,
+);

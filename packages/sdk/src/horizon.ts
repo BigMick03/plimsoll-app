@@ -136,7 +136,9 @@ export function findCurrency(tomlText: string, code: string, issuer: string): To
   const currencies = (Array.isArray(doc.CURRENCIES) ? doc.CURRENCIES : []) as TomlCurrency[];
   const match = currencies.find((c) => c.code === code && c.issuer === issuer);
   const base = docs.ORG_NAME ? { orgName: docs.ORG_NAME } : {};
-  return match ? { status: "confirmed", ...base, currency: match } : { status: "not-listed", ...base };
+  return match
+    ? { status: "confirmed", ...base, currency: match }
+    : { status: "not-listed", ...base };
 }
 
 /**

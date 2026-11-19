@@ -21,9 +21,7 @@ export function AssetCard({ asset, now }: { asset: AssetView; now: number }) {
       </div>
       <Gauge bps={c?.bps} status={status} />
       <div className="spread sub">
-        <span>
-          Supply {asset.supply ? formatUnits(asset.supply.amount, 7, 0) : "not posted"}
-        </span>
+        <span>Supply {asset.supply ? formatUnits(asset.supply.amount, 7, 0) : "not posted"}</span>
         <span>{c ? `Report ${ago(now - c.reportAsOf)}` : "No reserve report"}</span>
       </div>
       {c ? (

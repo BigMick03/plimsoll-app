@@ -167,7 +167,12 @@ export class PlimsollContracts {
     return opt(await this.read(this.ledger, "coverage", [addr(sac), u32(minTier)]), decodeCoverage);
   }
 
-  async isCovered(sac: string, minBps: number, maxAgeSeconds: number, minTier: Tier): Promise<boolean> {
+  async isCovered(
+    sac: string,
+    minBps: number,
+    maxAgeSeconds: number,
+    minTier: Tier,
+  ): Promise<boolean> {
     const v = await this.read(this.ledger, "is_covered", [
       addr(sac),
       u32(minBps),

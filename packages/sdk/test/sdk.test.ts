@@ -85,7 +85,9 @@ describe("format", () => {
     expect(tierLabel(Tier.IssuerSigned)).toBe("Issuer-signed");
     expect(tierFromName("auditor_signed")).toBe(Tier.AuditorSigned);
     expect(tierFromName("nope")).toBeUndefined();
-    expect(shortAddress("GBIE3ANCRVCBWETUZXWYKRMP27LQVJHX757XXAQUT3LYHVTNFPPPXEY4")).toBe("GBIE…XEY4");
+    expect(shortAddress("GBIE3ANCRVCBWETUZXWYKRMP27LQVJHX757XXAQUT3LYHVTNFPPPXEY4")).toBe(
+      "GBIE…XEY4",
+    );
     expect(ago(30)).toBe("just now");
     expect(ago(7_200)).toBe("2 hours ago");
     expect(ago(86_400)).toBe("1 day ago");
@@ -181,40 +183,48 @@ describe("indexer client", () => {
 });
 
 // Reads the real testnet deployment. Run with PLIMSOLL_LIVE=1.
-describe.skipIf(!process.env.PLIMSOLL_LIVE)("live testnet", () => {
-  const client = new PlimsollContracts(TESTNET);
-  const pusd = TESTNET.assets.PUSD!.sac;
+describe.skipIf(!process.env.PLIMSOLL_LIVE)(
+  "live testnet",
+  () => {
+    const client = new PlimsollContracts(TESTNET);
+    const pusd = TESTNET.assets.PUSD!.sac;
 
-  it("reads the listed PUSD asset", async (ctx) => {
-    const asset = await live(ctx, () => client.getAsset(pusd));
-    expect(asset?.code).toBe("PUSD");
-    expect(asset?.issuer).toBe(TESTNET.assets.PUSD!.issuer);
-  });
+    it("reads the listed PUSD asset", async (ctx) => {
+      const asset = await live(ctx, () => client.getAsset(pusd));
+      expect(asset?.code).toBe("PUSD");
+      expect(asset?.issuer).toBe(TESTNET.assets.PUSD!.issuer);
+    });
 
-  it("reads coverage and the issuer report", async (ctx) => {
-    const cov = await live(ctx, () => client.coverage(pusd, Tier.Transcribed));
-    expect(cov).not.toBeNull();
-    expect(cov!.bps).toBeGreaterThan(0);
-    const report = await live(ctx, () => client.getReport(pusd, Tier.IssuerSigned));
-    expect(report?.reporter).toBe(TESTNET.assets.PUSD!.issuer);
-    const covered = await live(ctx, () => client.isCovered(pusd, 0, 10 * 365 * 86_400, Tier.Transcribed));
-    expect(covered).toBe(true);
-  });
+    it("reads coverage and the issuer report", async (ctx) => {
+      const cov = await live(ctx, () => client.coverage(pusd, Tier.Transcribed));
+      expect(cov).not.toBeNull();
+      expect(cov!.bps).toBeGreaterThan(0);
+      const report = await live(ctx, () => client.getReport(pusd, Tier.IssuerSigned));
+      expect(report?.reporter).toBe(TESTNET.assets.PUSD!.issuer);
+      const covered = await live(ctx, () =>
+        client.isCovered(pusd, 0, 10 * 365 * 86_400, Tier.Transcribed),
+      );
+      expect(covered).toBe(true);
+    });
 
-  it("reports the under-backed QUSD demo as not covered", async (ctx) => {
-    const qusd = TESTNET.assets.QUSD!.sac;
-    const cov = await live(ctx, () => client.coverage(qusd, Tier.Transcribed));
-    expect(cov).not.toBeNull();
-    expect(cov!.bps).toBeLessThan(10_000);
-    expect(cov!.tier).toBe(Tier.Transcribed);
-    const covered = await live(ctx, () => client.isCovered(qusd, 10_000, 10 * 365 * 86_400, Tier.Transcribed));
-    expect(covered).toBe(false);
-  });
+    it("reports the under-backed QUSD demo as not covered", async (ctx) => {
+      const qusd = TESTNET.assets.QUSD!.sac;
+      const cov = await live(ctx, () => client.coverage(qusd, Tier.Transcribed));
+      expect(cov).not.toBeNull();
+      expect(cov!.bps).toBeLessThan(10_000);
+      expect(cov!.tier).toBe(Tier.Transcribed);
+      const covered = await live(ctx, () =>
+        client.isCovered(qusd, 10_000, 10 * 365 * 86_400, Tier.Transcribed),
+      );
+      expect(covered).toBe(false);
+    });
 
-  it("knows the registered supply poster", async (ctx) => {
-    const info = await live(ctx, () =>
-      client.getReporter("GDACI55IMI5DDZWMZ2EAXWK57AV75VE4626YYBAHQJYDV7QFPNNFK6HJ"),
-    );
-    expect(info?.name).toBe("Plimsoll indexer");
-  });
-}, 60_000);
+    it("knows the registered supply poster", async (ctx) => {
+      const info = await live(ctx, () =>
+        client.getReporter("GDACI55IMI5DDZWMZ2EAXWK57AV75VE4626YYBAHQJYDV7QFPNNFK6HJ"),
+      );
+      expect(info?.name).toBe("Plimsoll indexer");
+    });
+  },
+  60_000,
+);

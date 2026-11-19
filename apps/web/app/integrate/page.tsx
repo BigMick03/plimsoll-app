@@ -49,45 +49,99 @@ export default function IntegratePage() {
       <h1>Refuse under-backed assets in one call</h1>
       <p className="sub" style={{ maxWidth: 720 }}>
         Lending pools, vaults, routers and payment contracts can ask the coverage ledger whether an
-        asset is backed before accepting it. The answer is computed on-chain from the latest
-        supply snapshot and the freshest reserve report at or above the tier you require.
+        asset is backed before accepting it. The answer is computed on-chain from the latest supply
+        snapshot and the freshest reserve report at or above the tier you require.
       </p>
 
       <h2>Parameters</h2>
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Argument</th><th>Type</th><th>Meaning</th></tr>
+            <tr>
+              <th>Argument</th>
+              <th>Type</th>
+              <th>Meaning</th>
+            </tr>
           </thead>
           <tbody>
-            <tr><td><code>sac</code></td><td><code>Address</code></td><td>The asset&apos;s Stellar Asset Contract.</td></tr>
-            <tr><td><code>min_bps</code></td><td><code>u32</code></td><td>Minimum reserves ÷ supply in basis points. 10,000 = 100%.</td></tr>
-            <tr><td><code>max_age</code></td><td><code>u64</code></td><td>Seconds. Both the supply snapshot and the report must be at most this old.</td></tr>
-            <tr><td><code>min_tier</code></td><td><code>Tier</code></td><td>1 Transcribed, 2 Issuer-signed, 3 Auditor-signed. Weaker reports are ignored.</td></tr>
+            <tr>
+              <td>
+                <code>sac</code>
+              </td>
+              <td>
+                <code>Address</code>
+              </td>
+              <td>The asset&apos;s Stellar Asset Contract.</td>
+            </tr>
+            <tr>
+              <td>
+                <code>min_bps</code>
+              </td>
+              <td>
+                <code>u32</code>
+              </td>
+              <td>Minimum reserves ÷ supply in basis points. 10,000 = 100%.</td>
+            </tr>
+            <tr>
+              <td>
+                <code>max_age</code>
+              </td>
+              <td>
+                <code>u64</code>
+              </td>
+              <td>Seconds. Both the supply snapshot and the report must be at most this old.</td>
+            </tr>
+            <tr>
+              <td>
+                <code>min_tier</code>
+              </td>
+              <td>
+                <code>Tier</code>
+              </td>
+              <td>1 Transcribed, 2 Issuer-signed, 3 Auditor-signed. Weaker reports are ignored.</td>
+            </tr>
           </tbody>
         </table>
       </div>
 
       <h2>From a Soroban contract</h2>
-      <pre><code>{rust}</code></pre>
+      <pre>
+        <code>{rust}</code>
+      </pre>
       <p className="sub">
-        A working example is the <a href="https://github.com/plimsoll-protocol/plimsoll-contracts/tree/main/contracts/covered-vault">covered-vault</a> contract:
-        deposits are refused while the asset is not covered; withdrawals never are.
+        A working example is the{" "}
+        <a href="https://github.com/plimsoll-protocol/plimsoll-contracts/tree/main/contracts/covered-vault">
+          covered-vault
+        </a>{" "}
+        contract: deposits are refused while the asset is not covered; withdrawals never are.
       </p>
 
       <h2>From TypeScript</h2>
-      <pre><code>{ts}</code></pre>
+      <pre>
+        <code>{ts}</code>
+      </pre>
 
       <h2>From the command line</h2>
-      <pre><code>{curl}</code></pre>
+      <pre>
+        <code>{curl}</code>
+      </pre>
 
       <h2>Testnet addresses</h2>
       <div className="table-wrap">
         <table>
           <tbody>
-            <tr><td>Coverage ledger</td><td className="mono break">{TESTNET.coverageLedgerId}</td></tr>
-            <tr><td>Reporter registry</td><td className="mono break">{TESTNET.reporterRegistryId}</td></tr>
-            <tr><td>Covered vault (example)</td><td className="mono break">{TESTNET.coveredVaultId}</td></tr>
+            <tr>
+              <td>Coverage ledger</td>
+              <td className="mono break">{TESTNET.coverageLedgerId}</td>
+            </tr>
+            <tr>
+              <td>Reporter registry</td>
+              <td className="mono break">{TESTNET.reporterRegistryId}</td>
+            </tr>
+            <tr>
+              <td>Covered vault (example)</td>
+              <td className="mono break">{TESTNET.coveredVaultId}</td>
+            </tr>
           </tbody>
         </table>
       </div>
