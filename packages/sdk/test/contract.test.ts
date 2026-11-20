@@ -194,7 +194,7 @@ describe("PlimsollContracts writes", () => {
       vi.spyOn(client.server, "sendTransaction").mockResolvedValue(sent(status));
       const poll = vi.spyOn(client.server, "pollTransaction");
 
-      const err = await client.submit(signedXdr()).catch((e: unknown) => e);
+      const err = await client.submit(signedXdr(), { retryDelayMs: 0 }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(ContractCallError);
       expect(String(err)).toContain(`status ${status}`);
       expect(poll).not.toHaveBeenCalled();
@@ -211,5 +211,70 @@ describe("PlimsollContracts writes", () => {
     const err = await client.submit(signedXdr()).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ContractCallError);
     expect(String(err)).toContain(`transaction ${"ab".repeat(32)} FAILED`);
+  });
+
+  it("retries TRY_AGAIN_LATER then succeeds", async () => {
+    const client = new PlimsollContracts(config);
+    const send = vi
+      .spyOn(client.server, "sendTransaction")
+      .mockResolvedValueOnce(sent("TRY_AGAIN_LATER"))
+      .mockResolvedValueOnce(sent("TRY_AGAIN_LATER"))
+      .mockResolvedValueOnce(sent("PENDING"));
+    vi.spyOn(client.server, "pollTransaction").mockResolvedValue(
+      polled(rpc.Api.GetTransactionStatus.SUCCESS),
+    );
+    await expect(client.submit(signedXdr(), { retryDelayMs: 0 })).resolves.toBe("ab".repeat(32));
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  it("surfaces TRY_AGAIN_LATER after the retries are used up", async () => {
+    const client = new PlimsollContracts(config);
+    const send = vi
+      .spyOn(client.server, "sendTransaction")
+      .mockResolvedValue(sent("TRY_AGAIN_LATER"));
+    const err = await client
+      .submit(signedXdr(), { retries: 2, retryDelayMs: 0 })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ContractCallError);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry ERROR and includes the result XDR", async () => {
+    const client = new PlimsollContracts(config);
+    const errorResult = xdr.TransactionResult.fromXDR(
+      "AAAAAAAAAGT/////AAAAAQAAAAAAAAAB////+wAAAAA=",
+      "base64",
+    );
+    const send = vi
+      .spyOn(client.server, "sendTransaction")
+      .mockResolvedValue({ ...sent("ERROR"), errorResult });
+    const err = (await client
+      .submit(signedXdr(), { retryDelayMs: 0 })
+      .catch((e: unknown) => e)) as ContractCallError;
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(err.resultXdr).toBe(errorResult.toXDR("base64"));
+  });
+
+  it("applies fee and timeout options to prepared transactions", async () => {
+    const client = new PlimsollContracts(config);
+    const source = Keypair.random().publicKey();
+    vi.spyOn(client.server, "getAccount").mockResolvedValue(new Account(source, "1"));
+    const prep = vi
+      .spyOn(client.server, "prepareTransaction")
+      .mockImplementation(async (tx) => tx as never);
+    await client.prepareListAsset(source, sac, { fee: "5000", timeoutSeconds: 60 });
+    const tx = prep.mock.calls[0]![0] as Transaction;
+    expect(tx.fee).toBe("5000");
+    expect(Number(tx.timeBounds!.maxTime) - Math.floor(Date.now() / 1000)).toBeGreaterThanOrEqual(
+      55,
+    );
+    expect(Number(tx.timeBounds!.maxTime) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(60);
+    await client.prepareListAsset(source, sac);
+    const d = prep.mock.calls[1]![0] as Transaction;
+    expect(d.fee).toBe(BASE_FEE);
+    expect(Number(d.timeBounds!.maxTime) - Math.floor(Date.now() / 1000)).toBeGreaterThanOrEqual(
+      295,
+    );
+    expect(Number(d.timeBounds!.maxTime) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(300);
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref } from "@/lib/safe-href";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -257,9 +258,15 @@ function TomlLine({ domain, toml }: { domain: string; toml: TomlCheck | null }) 
         <div>
           Reserve attestation link:{" "}
           {attestation ? (
-            <a href={attestation} target="_blank" rel="noreferrer">
-              {attestation.replace(/^https?:\/\//, "").slice(0, 48)}
-            </a>
+            safeHref(attestation) ? (
+              <a href={safeHref(attestation)} target="_blank" rel="noreferrer">
+                {attestation.replace(/^https?:\/\//, "").slice(0, 48)}
+              </a>
+            ) : (
+              <>
+                <code>{attestation.slice(0, 48)}</code> (not a web link)
+              </>
+            )
           ) : (
             "not published"
           )}
