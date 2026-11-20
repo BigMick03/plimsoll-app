@@ -12,7 +12,7 @@
   "scripts": {
     "build": "npm run build -w @plimsoll/sdk && npm run build -w @plimsoll/web",
     "dev": "npm run build -w @plimsoll/sdk && npm run dev -w @plimsoll/web",
-    "test": "npm run test -w @plimsoll/sdk",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",
