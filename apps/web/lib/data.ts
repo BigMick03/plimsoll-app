@@ -123,11 +123,10 @@ function fromIndexer(a: IndexerAsset): AssetView {
 export async function loadFromChain(sac: string): Promise<AssetView | null> {
   const asset = await contracts.getAsset(sac);
   if (!asset) return null;
-  const tiers = [Tier.Transcribed, Tier.IssuerSigned, Tier.AuditorSigned];
-  const [supply, coverage, ...reportList] = await Promise.all([
+  const [supply, coverage, reportList] = await Promise.all([
     contracts.getSupply(sac),
     contracts.coverage(sac, Tier.Transcribed),
-    ...tiers.map((t) => contracts.getReport(sac, t)),
+    contracts.getReports(sac),
   ]);
   const reports: AssetView["reports"] = {};
   // Read from contract state, so there is no event or transaction behind these.

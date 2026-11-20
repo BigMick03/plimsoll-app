@@ -13,6 +13,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { Buffer } from "buffer";
+import { parseContractErrorCode } from "./errors";
 import type {
   AssetRecord,
   Coverage,
@@ -30,12 +31,16 @@ const READ_SOURCE = Keypair.random().publicKey();
 
 /** Thrown when a contract call fails in simulation (e.g. a contract error). */
 export class ContractCallError extends Error {
+  /** The contract's error number, when the failure was a contract error; otherwise undefined. */
+  readonly code: number | undefined;
+
   constructor(
     readonly method: string,
     readonly detail: string,
   ) {
     super(`${method} failed: ${detail}`);
     this.name = "ContractCallError";
+    this.code = parseContractErrorCode(detail);
   }
 }
 
@@ -44,10 +49,10 @@ export function sacAddress(code: string, issuer: string, networkPassphrase: stri
   return new Asset(code, issuer).contractId(networkPassphrase);
 }
 
-const addr = (a: string) => new Address(a).toScVal();
-const u32 = (n: number) => nativeToScVal(n, { type: "u32" });
-const u64 = (n: number | bigint) => nativeToScVal(BigInt(n), { type: "u64" });
-const i128 = (n: bigint) => nativeToScVal(n, { type: "i128" });
+export const addr = (a: string) => new Address(a).toScVal();
+export const u32 = (n: number) => nativeToScVal(n, { type: "u32" });
+export const u64 = (n: number | bigint) => nativeToScVal(BigInt(n), { type: "u64" });
+export const i128 = (n: bigint) => nativeToScVal(n, { type: "i128" });
 const str = (s: string) => nativeToScVal(s, { type: "string" });
 
 /** 64-char hex → BytesN<32>. */
@@ -56,17 +61,17 @@ export function bytes32(hex: string): xdr.ScVal {
   return xdr.ScVal.scvBytes(Buffer.from(hex, "hex"));
 }
 
-function toHex(v: unknown): string {
+export function toHex(v: unknown): string {
   if (v instanceof Uint8Array) return Buffer.from(v).toString("hex");
   throw new Error("Expected bytes");
 }
 
-const num = (v: unknown): number => Number(v);
-const big = (v: unknown): bigint => BigInt(v as bigint | number | string);
+export const num = (v: unknown): number => Number(v);
+export const big = (v: unknown): bigint => BigInt(v as bigint | number | string);
 
 // ---- decoders: scValToNative output → typed objects ------------------------
 
-type Raw = Record<string, unknown>;
+export type Raw = Record<string, unknown>;
 
 export function decodeAsset(raw: Raw): AssetRecord {
   return {
@@ -115,7 +120,7 @@ export function decodeReporter(raw: Raw): ReporterInfo {
   return { role: num(raw.role) as Role, name: String(raw.name), addedAt: num(raw.added_at) };
 }
 
-function opt<T>(v: unknown, decode: (r: Raw) => T): T | null {
+export function opt<T>(v: unknown, decode: (r: Raw) => T): T | null {
   return v == null ? null : decode(v as Raw);
 }
 
@@ -132,19 +137,60 @@ export interface ReservePostArgs {
   docUri: string;
 }
 
+/** Shared RPC plumbing: simulated reads and prepared (unsigned) transactions. */
+export abstract class ContractClient {
+  readonly server: rpc.Server;
+
+  constructor(protected readonly network: NetworkConfig) {
+    this.server = new rpc.Server(network.rpcUrl, {
+      allowHttp: network.rpcUrl.startsWith("http://"),
+    });
+  }
+
+  protected async read(contract: Contract, method: string, args: xdr.ScVal[]): Promise<unknown> {
+    const tx = new TransactionBuilder(new Account(READ_SOURCE, "0"), {
+      fee: BASE_FEE,
+      networkPassphrase: this.network.networkPassphrase,
+    })
+      .addOperation(contract.call(method, ...args))
+      .setTimeout(30)
+      .build();
+    const sim = await this.server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim)) {
+      throw new ContractCallError(method, sim.error);
+    }
+    const retval = sim.result?.retval;
+    return retval ? scValToNative(retval) : null;
+  }
+
+  protected async prepare(source: string, op: xdr.Operation): Promise<string> {
+    const account = await this.server.getAccount(source);
+    const tx = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: this.network.networkPassphrase,
+    })
+      .addOperation(op)
+      .setTimeout(300)
+      .build();
+    try {
+      const prepared = await this.server.prepareTransaction(tx);
+      return prepared.toXDR();
+    } catch (err) {
+      throw new ContractCallError("prepare", err instanceof Error ? err.message : String(err));
+    }
+  }
+}
+
 /**
  * Reads the Plimsoll contracts through RPC simulation and builds prepared
  * transactions for the write calls. Signing is left to the caller's wallet.
  */
-export class PlimsollContracts {
-  readonly server: rpc.Server;
+export class PlimsollContracts extends ContractClient {
   readonly ledger: Contract;
   readonly registry: Contract;
 
   constructor(readonly config: NetworkConfig) {
-    this.server = new rpc.Server(config.rpcUrl, {
-      allowHttp: config.rpcUrl.startsWith("http://"),
-    });
+    super(config);
     this.ledger = new Contract(config.coverageLedgerId);
     this.registry = new Contract(config.reporterRegistryId);
   }
@@ -157,6 +203,12 @@ export class PlimsollContracts {
 
   async getSupply(sac: string): Promise<SupplySnapshot | null> {
     return opt(await this.read(this.ledger, "get_supply", [addr(sac)]), decodeSupply);
+  }
+
+  /** Every tier's latest report, in one call. */
+  async getReports(sac: string): Promise<ReserveReport[]> {
+    const v = await this.read(this.ledger, "get_reports", [addr(sac)]);
+    return Array.isArray(v) ? v.map((r) => decodeReport(r as Raw)) : [];
   }
 
   async getReport(sac: string, tier: Tier): Promise<ReserveReport | null> {
@@ -229,40 +281,5 @@ export class PlimsollContracts {
       throw new ContractCallError("submit", `transaction ${sent.hash} ${final.status}`);
     }
     return sent.hash;
-  }
-
-  // -- internals --
-
-  private async read(contract: Contract, method: string, args: xdr.ScVal[]): Promise<unknown> {
-    const tx = new TransactionBuilder(new Account(READ_SOURCE, "0"), {
-      fee: BASE_FEE,
-      networkPassphrase: this.config.networkPassphrase,
-    })
-      .addOperation(contract.call(method, ...args))
-      .setTimeout(30)
-      .build();
-    const sim = await this.server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationError(sim)) {
-      throw new ContractCallError(method, sim.error);
-    }
-    const retval = sim.result?.retval;
-    return retval ? scValToNative(retval) : null;
-  }
-
-  private async prepare(source: string, op: xdr.Operation): Promise<string> {
-    const account = await this.server.getAccount(source);
-    const tx = new TransactionBuilder(account, {
-      fee: BASE_FEE,
-      networkPassphrase: this.config.networkPassphrase,
-    })
-      .addOperation(op)
-      .setTimeout(300)
-      .build();
-    try {
-      const prepared = await this.server.prepareTransaction(tx);
-      return prepared.toXDR();
-    } catch (err) {
-      throw new ContractCallError("prepare", err instanceof Error ? err.message : String(err));
-    }
   }
 }

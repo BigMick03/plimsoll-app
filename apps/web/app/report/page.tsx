@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Role, Tier, parseUnits, sha256Hex, tierLabel } from "@plimsoll/sdk";
+import { ContractCallError, Role, Tier, describeError, parseUnits, sha256Hex, tierLabel } from "@plimsoll/sdk";
 import { explorer } from "@/lib/config";
 import { contracts, loadAssets, type AssetView } from "@/lib/data";
 import { WalletError, connectWallet, signXdr } from "@/lib/wallet";
@@ -100,7 +100,7 @@ export default function ReportPage() {
       setStatus({ kind: "ok", hash, tier });
     } catch (err) {
       const msg = err instanceof WalletError || err instanceof Error ? err.message : String(err);
-      setStatus({ kind: "err", msg: friendly(msg) });
+      setStatus({ kind: "err", msg: friendly(err, msg) });
     }
   };
 
@@ -239,16 +239,7 @@ export default function ReportPage() {
   );
 }
 
-const ERRORS: Record<string, string> = {
-  "#5": "This account is not the issuer and is not a registered auditor or transcriber.",
-  "#9": "The as-of date is in the future.",
-  "#10": "There is already a report at this tier with the same or a later as-of date.",
-  "#11": "The document URL is empty or longer than 256 characters.",
-  "#3": "This asset is not listed on the coverage ledger.",
-  "#6": "Reserves cannot be negative.",
-};
-
-function friendly(msg: string): string {
-  const m = msg.match(/Error\(Contract, (#\d+)\)/);
-  return (m && m[1] && ERRORS[m[1]]) || msg;
+function friendly(e: unknown, fallback: string): string {
+  const code = e instanceof ContractCallError ? e.code : undefined;
+  return (code !== undefined && describeError(code, "ledger")) || fallback;
 }

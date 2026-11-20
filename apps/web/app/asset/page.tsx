@@ -354,36 +354,132 @@ function DocCheck({ uri, hash }: { uri: string; hash: string }) {
   );
 }
 
+type CoveredParams = { bps: number; days: number; tier: Tier };
+
+/** Parses the form text. Percent may have up to two decimals (whole basis points). */
+function parseCoveredParams(
+  pct: string,
+  days: string,
+  tier: string,
+): { ok: true; value: CoveredParams } | { ok: false; error: string } {
+  if (!/^\d{1,4}(\.\d{1,2})?$/.test(pct.trim())) {
+    return { ok: false, error: "Minimum percentage must be a number from 0 to 1000, with at most two decimals." };
+  }
+  const bps = Math.round(Number(pct) * 100);
+  if (bps > 100_000) return { ok: false, error: "Minimum percentage cannot exceed 1000%." };
+  if (!/^\d{1,4}$/.test(days.trim()) || Number(days) < 1 || Number(days) > 3650) {
+    return { ok: false, error: "Maximum age must be a whole number of days from 1 to 3650." };
+  }
+  const t = Number(tier);
+  if (t !== Tier.Transcribed && t !== Tier.IssuerSigned && t !== Tier.AuditorSigned) {
+    return { ok: false, error: "Choose a minimum tier." };
+  }
+  return { ok: true, value: { bps, days: Number(days), tier: t } };
+}
+
+function coveredCommands(sac: string, p: CoveredParams) {
+  const maxAge = p.days * 86_400;
+  return {
+    cli:
+      `stellar contract invoke --network ${config.networkName} --send=no \\\n` +
+      `  --id ${config.network.coverageLedgerId} -- \\\n` +
+      `  is_covered --sac ${sac} \\\n` +
+      `  --min_bps ${p.bps} --max_age ${maxAge} --min_tier ${p.tier}`,
+    sdk: `await plimsoll.isCovered("${sac}", ${p.bps}, ${maxAge}, ${p.tier});`,
+  };
+}
+
 function LiveCheck({ sac }: { sac: string }) {
+  const [pct, setPct] = useState("100");
+  const [days, setDays] = useState("31");
+  const [tier, setTier] = useState(String(Tier.Transcribed));
   const [state, setState] = useState<
-    { kind: "idle" | "busy" } | { kind: "done"; text: string } | { kind: "err"; text: string }
+    | { kind: "idle" | "busy" }
+    | { kind: "done"; text: string; ran: CoveredParams }
+    | { kind: "err"; text: string }
   >({ kind: "idle" });
+  const parsed = parseCoveredParams(pct, days, tier);
   const run = async () => {
+    if (!parsed.ok) return;
+    const p = parsed.value;
     setState({ kind: "busy" });
     try {
       const [cov, ok] = await Promise.all([
-        contracts.coverage(sac, Tier.Transcribed),
-        contracts.isCovered(sac, 10_000, 31 * 86_400, Tier.Transcribed),
+        contracts.coverage(sac, p.tier),
+        contracts.isCovered(sac, p.bps, p.days * 86_400, p.tier),
       ]);
       setState({
         kind: "done",
+        ran: p,
         text: cov
-          ? `On-chain: ${bpsToPercent(cov.bps) ?? "no supply"} · is_covered(100%, 31 days) = ${ok}`
+          ? `On-chain: ${bpsToPercent(cov.bps) ?? "no supply"} · is_covered(${p.bps / 100}%, ${p.days} days, ${tierLabel(p.tier)}) = ${ok}`
           : "On-chain: no coverage yet",
       });
     } catch (e) {
       setState({ kind: "err", text: e instanceof Error ? e.message : String(e) });
     }
   };
+  const shown = state.kind === "done" ? state.ran : parsed.ok ? parsed.value : null;
+  const cmds = shown ? coveredCommands(sac, shown) : null;
   return (
     <div style={{ textAlign: "right" }} aria-live="polite">
-      <button type="button" className="secondary" onClick={run} disabled={state.kind === "busy"}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <label>
+          Min coverage %
+          <input
+            inputMode="decimal"
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            aria-invalid={!parsed.ok}
+            style={{ width: 90 }}
+          />
+        </label>
+        <label>
+          Max age (days)
+          <input
+            inputMode="numeric"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            aria-invalid={!parsed.ok}
+            style={{ width: 90 }}
+          />
+        </label>
+        <label>
+          Min tier
+          <select value={tier} onChange={(e) => setTier(e.target.value)}>
+            {[Tier.Transcribed, Tier.IssuerSigned, Tier.AuditorSigned].map((t) => (
+              <option key={t} value={t}>
+                {tierLabel(t)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {!parsed.ok ? (
+        <div className="sub" role="alert" style={{ marginTop: 6 }}>
+          {parsed.error}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className="secondary"
+        onClick={run}
+        disabled={state.kind === "busy" || !parsed.ok}
+        style={{ marginTop: 6 }}
+      >
         {state.kind === "busy" ? "Reading contract…" : "Check on-chain now"}
       </button>
       {"text" in state ? (
         <div className="sub" style={{ marginTop: 6 }}>
           {state.text}
         </div>
+      ) : null}
+      {cmds ? (
+        <details style={{ marginTop: 6, textAlign: "left" }}>
+          <summary>CLI command and SDK call</summary>
+          <pre style={{ overflowX: "auto" }}>{cmds.cli}</pre>
+          <pre style={{ overflowX: "auto" }}>{cmds.sdk}</pre>
+        </details>
       ) : null}
     </div>
   );
