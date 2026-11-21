@@ -86,7 +86,10 @@ export default function ListPage() {
       } else {
         setStep({
           kind: "err",
-          msg: /#1\b/.test(msg) ? "That address is not a Stellar Asset Contract." : msg,
+          msg:
+            (e instanceof ContractCallError && e.code === LedgerError.NotAStellarAsset
+              ? describeError(e.code, "ledger")
+              : undefined) ?? msg,
         });
       }
     }
