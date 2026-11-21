@@ -37,11 +37,29 @@ export class ContractCallError extends Error {
   constructor(
     readonly method: string,
     readonly detail: string,
+    /** Base64 result XDR from the RPC, when it returned one. */
+    readonly resultXdr?: string,
   ) {
     super(`${method} failed: ${detail}`);
     this.name = "ContractCallError";
     this.code = parseContractErrorCode(detail);
   }
+}
+
+/** Fee and validity window for a prepared transaction. Defaults: BASE_FEE, 300 seconds. */
+export interface PrepareOptions {
+  /** Base fee per operation in stroops, as a string or number. */
+  fee?: string | number;
+  /** Seconds the transaction stays valid. */
+  timeoutSeconds?: number;
+}
+
+/** Retry behaviour for `submit` when the RPC answers TRY_AGAIN_LATER. */
+export interface SubmitOptions {
+  /** Retries after the first attempt. Default 3. */
+  retries?: number;
+  /** Delay before the first retry; doubles each time. Default 500. */
+  retryDelayMs?: number;
 }
 
 /** The SAC address of a classic asset on a given network. */
@@ -163,14 +181,18 @@ export abstract class ContractClient {
     return retval ? scValToNative(retval) : null;
   }
 
-  protected async prepare(source: string, op: xdr.Operation): Promise<string> {
+  protected async prepare(
+    source: string,
+    op: xdr.Operation,
+    opts: PrepareOptions = {},
+  ): Promise<string> {
     const account = await this.server.getAccount(source);
     const tx = new TransactionBuilder(account, {
-      fee: BASE_FEE,
+      fee: String(opts.fee ?? BASE_FEE),
       networkPassphrase: this.network.networkPassphrase,
     })
       .addOperation(op)
-      .setTimeout(300)
+      .setTimeout(opts.timeoutSeconds ?? 300)
       .build();
     try {
       const prepared = await this.server.prepareTransaction(tx);
@@ -241,20 +263,26 @@ export class PlimsollContracts extends ContractClient {
   // -- writes: return prepared, unsigned transaction XDR --
 
   /** List a classic asset by SAC address. Anyone may call it. */
-  async prepareListAsset(source: string, sac: string): Promise<string> {
-    return this.prepare(source, this.ledger.call("list_asset", addr(sac)));
+  async prepareListAsset(source: string, sac: string, opts?: PrepareOptions): Promise<string> {
+    return this.prepare(source, this.ledger.call("list_asset", addr(sac)), opts);
   }
 
   /** Deploy the SAC for a classic asset (needed once per asset per network). */
-  async prepareDeploySac(source: string, code: string, issuer: string): Promise<string> {
+  async prepareDeploySac(
+    source: string,
+    code: string,
+    issuer: string,
+    opts?: PrepareOptions,
+  ): Promise<string> {
     return this.prepare(
       source,
       Operation.createStellarAssetContract({ asset: new Asset(code, issuer) }),
+      opts,
     );
   }
 
   /** Post a reserve figure. The reporter must be the transaction source. */
-  async preparePostReserve(a: ReservePostArgs): Promise<string> {
+  async preparePostReserve(a: ReservePostArgs, opts?: PrepareOptions): Promise<string> {
     return this.prepare(
       a.reporter,
       this.ledger.call(
@@ -266,19 +294,34 @@ export class PlimsollContracts extends ContractClient {
         bytes32(a.docHash),
         str(a.docUri),
       ),
+      opts,
     );
   }
 
   /** Submit a signed transaction and wait for it to land. Returns the hash. */
-  async submit(signedXdr: string): Promise<string> {
-    const tx = TransactionBuilder.fromXDR(signedXdr, this.config.networkPassphrase);
-    const sent = await this.server.sendTransaction(tx);
+  async submit(signedXdr: string, opts: SubmitOptions = {}): Promise<string> {
+    const tx = TransactionBuilder.fromXDR(signedXdr, this.network.networkPassphrase);
+    const retries = Math.max(0, opts.retries ?? 3);
+    let delay = opts.retryDelayMs ?? 500;
+    let sent = await this.server.sendTransaction(tx);
+    // TRY_AGAIN_LATER is the RPC asking for a retry: back off, then surface it.
+    for (let i = 0; i < retries && sent.status === "TRY_AGAIN_LATER"; i++) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+      sent = await this.server.sendTransaction(tx);
+    }
     if (sent.status === "ERROR" || sent.status === "TRY_AGAIN_LATER") {
-      throw new ContractCallError("submit", `status ${sent.status}`);
+      throw new ContractCallError(
+        "submit",
+        `status ${sent.status}`,
+        sent.errorResult?.toXDR("base64"),
+      );
     }
     const final = await this.server.pollTransaction(sent.hash, { attempts: 30 });
     if (final.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
-      throw new ContractCallError("submit", `transaction ${sent.hash} ${final.status}`);
+      const resultXdr =
+        "resultXdr" in final && final.resultXdr ? final.resultXdr.toXDR("base64") : undefined;
+      throw new ContractCallError("submit", `transaction ${sent.hash} ${final.status}`, resultXdr);
     }
     return sent.hash;
   }

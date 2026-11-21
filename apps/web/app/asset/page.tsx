@@ -1,5 +1,6 @@
 "use client";
 
+import { safeHref } from "@/lib/safe-href";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -307,10 +308,20 @@ function ReportRow({
         </div>
       </td>
       <td>
-        <a href={report.docUri} target="_blank" rel="noreferrer">
-          Open
-        </a>
-        <DocCheck uri={report.docUri} hash={report.docHash} />
+        {safeHref(report.docUri) ? (
+          <>
+            <a href={safeHref(report.docUri)} target="_blank" rel="noreferrer">
+              Open
+            </a>
+            <DocCheck uri={report.docUri} hash={report.docHash} />
+          </>
+        ) : (
+          <span className="sub">
+            <code>{report.docUri}</code>
+            <br />
+            Not a web link, so it is shown as text and not checked here.
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -637,9 +648,15 @@ function IssuerToml({ asset }: { asset: AssetView }) {
         <li>
           Reserve attestation link:{" "}
           {currency.attestation_of_reserve ? (
-            <a href={currency.attestation_of_reserve} target="_blank" rel="noreferrer">
-              {currency.attestation_of_reserve}
-            </a>
+            safeHref(currency.attestation_of_reserve) ? (
+              <a href={safeHref(currency.attestation_of_reserve)} target="_blank" rel="noreferrer">
+                {currency.attestation_of_reserve}
+              </a>
+            ) : (
+              <>
+                <code>{currency.attestation_of_reserve}</code> (not a web link)
+              </>
+            )
           ) : (
             "not published"
           )}
