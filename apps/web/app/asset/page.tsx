@@ -363,7 +363,10 @@ function parseCoveredParams(
   tier: string,
 ): { ok: true; value: CoveredParams } | { ok: false; error: string } {
   if (!/^\d{1,4}(\.\d{1,2})?$/.test(pct.trim())) {
-    return { ok: false, error: "Minimum percentage must be a number from 0 to 1000, with at most two decimals." };
+    return {
+      ok: false,
+      error: "Minimum percentage must be a number from 0 to 1000, with at most two decimals.",
+    };
   }
   const bps = Math.round(Number(pct) * 100);
   if (bps > 100_000) return { ok: false, error: "Minimum percentage cannot exceed 1000%." };

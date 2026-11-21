@@ -159,8 +159,7 @@ describe("CoveredVaultClient", () => {
   });
 
   it("prepares deposit and withdraw as unsigned XDR", async () => {
-    const { Account, Keypair, TransactionBuilder } =
-      await import("@stellar/stellar-sdk");
+    const { Account, Keypair, TransactionBuilder } = await import("@stellar/stellar-sdk");
     const from = Keypair.random().publicKey();
     const client = new CoveredVaultClient(config, vaultId);
     vi.spyOn(client.server, "getAccount").mockResolvedValue(new Account(from, "1"));

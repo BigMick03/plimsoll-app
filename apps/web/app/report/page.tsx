@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ContractCallError, Role, Tier, describeError, parseUnits, sha256Hex, tierLabel } from "@plimsoll/sdk";
+import {
+  ContractCallError,
+  Role,
+  Tier,
+  describeError,
+  parseUnits,
+  sha256Hex,
+  tierLabel,
+} from "@plimsoll/sdk";
 import { explorer } from "@/lib/config";
 import { contracts, loadAssets, type AssetView } from "@/lib/data";
 import { WalletError, connectWallet, signXdr } from "@/lib/wallet";
