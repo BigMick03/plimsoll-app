@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StrKey } from "@stellar/stellar-sdk";
-import { fetchIssuerAssetCodes, sacAddress } from "@plimsoll/sdk";
+import {
+  ContractCallError,
+  LedgerError,
+  describeError,
+  fetchIssuerAssetCodes,
+  sacAddress,
+} from "@plimsoll/sdk";
 import { config, explorer } from "@/lib/config";
 import { contracts, loadAssets } from "@/lib/data";
 import { unissuedWarning } from "@/lib/watch";
