@@ -8,7 +8,8 @@
     "build": "next build && node scripts/apply-csp.mjs",
     "test": "vitest run",
     "start": "npx serve out",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@plimsoll/sdk": "0.1.0",

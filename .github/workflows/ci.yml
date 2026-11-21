@@ -38,7 +38,7 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format:check
-      - name: Test SDK (offline)
+      - name: Test SDK and web (offline)
         run: npm test
       - name: Build web
         run: npm run build -w @plimsoll/web

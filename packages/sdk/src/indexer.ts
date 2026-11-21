@@ -100,69 +100,146 @@ export class IndexerError extends Error {
   }
 }
 
+/** Per-request options. */
+export interface RequestOptions {
+  /** Cancels the request; the call rejects with an IndexerAbortError. */
+  signal?: AbortSignal;
+  /** Rejects with an IndexerAbortError after this many milliseconds. */
+  timeoutMs?: number;
+}
+
+export interface IndexerHealth {
+  status: string;
+  [key: string]: unknown;
+}
+
+/** Thrown when a request is aborted by the caller or by a timeout. */
+export class IndexerAbortError extends Error {
+  constructor(
+    readonly reason: "aborted" | "timeout",
+    message: string,
+  ) {
+    super(message);
+    this.name = "IndexerAbortError";
+  }
+}
+
 export class IndexerClient {
   private readonly base: string;
 
   constructor(
     baseUrl: string,
     private readonly fetchImpl: typeof fetch = (...args) => fetch(...args),
+    private readonly defaultTimeoutMs?: number,
   ) {
     this.base = baseUrl.replace(/\/+$/, "");
   }
 
-  async listAssets(minTier = 1): Promise<IndexerAsset[]> {
-    const body = await this.get<{ assets: IndexerAsset[] }>(`/v1/assets?min_tier=${minTier}`);
+  async listAssets(minTier = 1, opts?: RequestOptions): Promise<IndexerAsset[]> {
+    const body = await this.get<{ assets: IndexerAsset[] }>(`/v1/assets?min_tier=${minTier}`, opts);
     return body.assets;
   }
 
-  getAsset(sac: string, minTier = 1): Promise<IndexerAsset> {
-    return this.get(`/v1/assets/${encodeURIComponent(sac)}?min_tier=${minTier}`);
+  getAsset(sac: string, minTier = 1, opts?: RequestOptions): Promise<IndexerAsset> {
+    return this.get(`/v1/assets/${encodeURIComponent(sac)}?min_tier=${minTier}`, opts);
   }
 
-  async supplyHistory(sac: string, limit = 100): Promise<IndexerSupply[]> {
+  async supplyHistory(sac: string, limit = 100, opts?: RequestOptions): Promise<IndexerSupply[]> {
     const body = await this.get<{ supply: IndexerSupply[] }>(
       `/v1/assets/${encodeURIComponent(sac)}/supply?limit=${limit}`,
+      opts,
     );
     return body.supply;
   }
 
-  async reportHistory(sac: string, limit = 100): Promise<IndexerReport[]> {
+  async reportHistory(sac: string, limit = 100, opts?: RequestOptions): Promise<IndexerReport[]> {
     const body = await this.get<{ reports: IndexerReport[] }>(
       `/v1/assets/${encodeURIComponent(sac)}/reports?limit=${limit}`,
+      opts,
     );
     return body.reports;
   }
 
-  async reporters(): Promise<IndexerReporter[]> {
-    const body = await this.get<{ reporters: IndexerReporter[] }>(`/v1/reporters`);
+  async reporters(opts?: RequestOptions): Promise<IndexerReporter[]> {
+    const body = await this.get<{ reporters: IndexerReporter[] }>(`/v1/reporters`, opts);
     return body.reporters;
   }
 
-  network(): Promise<IndexerNetwork> {
-    return this.get(`/v1/network`);
+  network(opts?: RequestOptions): Promise<IndexerNetwork> {
+    return this.get(`/v1/network`, opts);
+  }
+
+  /** GET /healthz. */
+  health(opts?: RequestOptions): Promise<IndexerHealth> {
+    return this.get(`/healthz`, opts);
   }
 
   /** Raw breakdown bytes, exactly as hashed on-chain. */
-  async breakdown(hash: string): Promise<Uint8Array> {
-    const res = await this.fetchImpl(`${this.base}/v1/breakdowns/${encodeURIComponent(hash)}`);
-    if (!res.ok) throw new IndexerError(res.status, `breakdown ${hash}: ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
+  async breakdown(hash: string, opts?: RequestOptions): Promise<Uint8Array> {
+    return this.request(opts, async (init) => {
+      const res = await this.fetchImpl(
+        `${this.base}/v1/breakdowns/${encodeURIComponent(hash)}`,
+        init,
+      );
+      if (!res.ok) throw new IndexerError(res.status, `breakdown ${hash}: ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    });
   }
 
-  private async get<T>(path: string): Promise<T> {
-    const res = await this.fetchImpl(`${this.base}${path}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      let message = `${res.status}`;
-      try {
-        const body = (await res.json()) as { error?: string };
-        if (body.error) message = body.error;
-      } catch {
-        // keep status as the message
+  private get<T>(path: string, opts?: RequestOptions): Promise<T> {
+    return this.request(opts, async (init) => {
+      const res = await this.fetchImpl(`${this.base}${path}`, {
+        ...init,
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        let message = `${res.status}`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body.error) message = body.error;
+        } catch {
+          // keep status as the message
+        }
+        throw new IndexerError(res.status, message);
       }
-      throw new IndexerError(res.status, message);
+      return (await res.json()) as T;
+    });
+  }
+
+  /** Runs one request under the caller signal and timeout; no timeout unless set. */
+  private async request<T>(
+    opts: RequestOptions | undefined,
+    run: (init: RequestInit) => Promise<T>,
+  ): Promise<T> {
+    const timeoutMs = opts?.timeoutMs ?? this.defaultTimeoutMs;
+    const external = opts?.signal;
+    if (timeoutMs === undefined && !external) return run({});
+    const ctl = new AbortController();
+    let reason = "aborted" as "aborted" | "timeout";
+    const onAbort = () => ctl.abort();
+    if (external?.aborted) ctl.abort();
+    external?.addEventListener("abort", onAbort);
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            reason = "timeout";
+            ctl.abort();
+          }, timeoutMs);
+    try {
+      if (ctl.signal.aborted) throw new IndexerAbortError("aborted", "request aborted");
+      return await run({ signal: ctl.signal });
+    } catch (err) {
+      if (ctl.signal.aborted) {
+        throw new IndexerAbortError(
+          reason,
+          reason === "timeout" ? `request timed out after ${timeoutMs}ms` : "request aborted",
+        );
+      }
+      throw err;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      external?.removeEventListener("abort", onAbort);
     }
-    return (await res.json()) as T;
   }
 }

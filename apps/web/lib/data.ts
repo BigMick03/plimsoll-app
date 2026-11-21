@@ -73,7 +73,7 @@ export const indexer = config.indexerUrl
 
 const secs = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
-function fromIndexer(a: IndexerAsset): AssetView {
+export function fromIndexer(a: IndexerAsset): AssetView {
   const reports: AssetView["reports"] = {};
   for (const r of Object.values(a.reports)) {
     if (!r) continue;
