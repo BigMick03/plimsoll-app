@@ -107,7 +107,7 @@ describe("loadAssets fallback", () => {
     vi.spyOn(contracts, "getAsset").mockResolvedValue(chainAsset as never);
     vi.spyOn(contracts, "getSupply").mockResolvedValue(null);
     vi.spyOn(contracts, "coverage").mockResolvedValue(null);
-    vi.spyOn(contracts, "getReport").mockResolvedValue(null);
+    vi.spyOn(contracts, "getReports").mockResolvedValue([]);
   };
 
   it("uses the indexer when it answers", async () => {
@@ -153,7 +153,7 @@ describe("loadAsset fallback", () => {
     vi.spyOn(contracts, "getAsset").mockResolvedValue(chainAsset as never);
     vi.spyOn(contracts, "getSupply").mockResolvedValue(null);
     vi.spyOn(contracts, "coverage").mockResolvedValue(null);
-    vi.spyOn(contracts, "getReport").mockResolvedValue(null);
+    vi.spyOn(contracts, "getReports").mockResolvedValue([]);
     expect((await loadAsset(SAC))?.source).toBe("chain");
   });
 

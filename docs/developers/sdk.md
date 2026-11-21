@@ -29,6 +29,7 @@ formatUnits(cov!.reserves);    // "1,020,000"
 | `getAsset(sac)` | `AssetRecord \| null` |
 | `getSupply(sac)` | `SupplySnapshot \| null` |
 | `getReport(sac, tier)` | `ReserveReport \| null` |
+| `getReports(sac)` | `ReserveReport[]`, every tier's latest report in one call |
 | `coverage(sac, minTier)` | `Coverage \| null` |
 | `isCovered(sac, minBps, maxAgeSeconds, minTier)` | `boolean` |
 | `getReporter(address)` | `ReporterInfo \| null` |
@@ -37,8 +38,29 @@ formatUnits(cov!.reserves);    // "1,020,000"
 | `preparePostReserve({ reporter, sac, amount, asOf, docHash, docUri })` | unsigned XDR |
 | `submit(signedXdr)` | transaction hash, after it succeeds |
 
-A failed simulation throws `ContractCallError`, whose message contains the
-contract error, e.g. `Error(Contract, #5)` for `NotReporter`.
+A failed simulation throws `ContractCallError`. For contract errors its `code`
+is the error number (undefined otherwise); compare it with the `LedgerError`,
+`RegistryError` and `VaultError` enums, or call `describeError(code, "ledger" | "registry" | "vault")`
+for a default message.
+
+```ts
+try {
+  await plimsoll.preparePostReserve(args);
+} catch (e) {
+  if (e instanceof ContractCallError && e.code === LedgerError.NotReporter) { /* ... */ }
+}
+```
+
+### `CoveredVaultClient`
+
+`new CoveredVaultClient(TESTNET, TESTNET.coveredVaultId)`, sharing its RPC plumbing with `PlimsollContracts`.
+
+| Method | Returns |
+| --- | --- |
+| `config()` | `VaultConfig \| null` (`ledger, asset, minBps, maxAge, minTier`) |
+| `balance(address)` | `bigint` |
+| `prepareDeposit(from, amount)` | unsigned XDR |
+| `prepareWithdraw(to, amount)` | unsigned XDR |
 
 ### Posting a report
 

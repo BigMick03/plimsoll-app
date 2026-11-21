@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { StrKey } from "@stellar/stellar-sdk";
-import { sacAddress } from "@plimsoll/sdk";
+import { ContractCallError, LedgerError, describeError, sacAddress } from "@plimsoll/sdk";
 import { config, explorer } from "@/lib/config";
 import { contracts } from "@/lib/data";
 import { connectWallet, signXdr } from "@/lib/wallet";
@@ -51,7 +51,10 @@ export default function ListPage() {
       } else {
         setStep({
           kind: "err",
-          msg: /#1\b/.test(msg) ? "That address is not a Stellar Asset Contract." : msg,
+          msg:
+            (e instanceof ContractCallError && e.code === LedgerError.NotAStellarAsset
+              ? describeError(e.code, "ledger")
+              : undefined) ?? msg,
         });
       }
     }

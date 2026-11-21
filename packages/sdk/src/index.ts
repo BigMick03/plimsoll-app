@@ -1,6 +1,8 @@
 export * from "./types";
 export * from "./format";
 export * from "./contract";
+export * from "./errors";
+export * from "./vault";
 export * from "./indexer";
 export * from "./verify";
 export { TESTNET } from "./networks";
